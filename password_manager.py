@@ -1,10 +1,10 @@
 import os
 import sys
 import json
+import time
 import hashlib
 import base64
 import hmac
-import time
 import uuid
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -41,6 +41,48 @@ else:
 VAULT_FILE = 'vault.json'
 MASTER_FILE = 'master.key'
 SALT_SIZE = 32
+
+def clear_screen():
+    os.system('cls' if sys.platform == "win32" else 'clear')
+
+def print_slow(text , delay = 0.02):
+    for char in text:
+        print(char , end = "" , flush = True)
+        time.sleep(delay)
+    print()
+
+def print_banner():
+    clear_screen()
+    banner = """
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║           🔐  SECURE PASSWORD MANAGER  🔐                ║
+║                        v2.0                              ║
+║                                                          ║
+║          Your passwords. Encrypted. Safe.                ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+"""
+    print(banner)
+
+def print_separator():
+    print("-"*60)
+
+def print_success(msg):
+    print(f"\n  ✅  {msg}")
+
+def print_error(msg):
+    print(f"\n  ❌  {msg}")
+
+def print_warning(msg):
+    print(f"\n  ⚠️   {msg}")
+
+def print_info(msg):
+    print(f"\n  ℹ️   {msg}")
+
+def press_enter():
+    """Wait for user to press Enter"""
+    input("\n  Press Enter to continue...")
 """=================================================================Master Password Class================================================================="""
 class MasterPassword:
     def __init__(self, password, salt):
@@ -67,20 +109,31 @@ class MasterPassword:
             return hmac.compare_digest(password_hash, stored_hash)
         
         except Exception as e:
-            print(f"❌ Error verifying password: {e}")
+            print_error(f"Error verifying password: {e}")
             return False
 #=================================================================Create Master Password=================================================================    
     def create_master_password(self):
-        print("\n" + "="*60)
-        print("🔐 CREATE MASTER PASSWORD")
-        print("="*60)
-        print("\nThis password will protect ALL your passwords.")
-        print("⚠️  If you forget it, you CANNOT recover your data!")
-        print("\nRequirements:")
-        print("  • At least 8 characters")
-        print("  • Mix of letters, numbers, symbols")
-        print("  • Use at least one uppercase letter, one lowercase letter, and one number")
-        print()
+        clear_screen()
+        print_banner()
+        print("  🔐  FIRST TIME SETUP")
+        print_separator()
+        print("""
+            Welcome to Secure Password Manager!
+
+            You need to create a MASTER PASSWORD.
+            This is the ONE password that protects all your others.
+
+            ⚠️  WARNING: If you forget this password,
+                your data CANNOT be recovered!
+
+            Requirements:
+                • At least 8 characters
+                • One uppercase letter  (A-Z)
+                • One lowercase letter  (a-z)
+                • One number            (0-9)
+                • One special character (!@#$...)
+            """)
+        print_separator()
 
         while True:
             password = secure_input("Enter master password: ")
@@ -91,11 +144,11 @@ class MasterPassword:
                          any(not c.isalnum() for c in password)]) 
             
             if not check: 
-                print("❌ Password does not meet requirements. Try again.\n") 
+                print_error("Password does not meet requirements. Try again.")
                 continue
             confirm = secure_input("Confirm master password: ")
             if password != confirm:
-                print("❌ Passwords don't match!")
+                print_error("Passwords don't match!")
                 continue
 
             salt = os.urandom(SALT_SIZE)
@@ -106,30 +159,32 @@ class MasterPassword:
             }
             with open(MASTER_FILE , "w") as f:
                 json.dump(data , f)
-            print("✅ Master password created successfully!")
+            print_success("Master password created successfully!")
             return password
 #=================================================================Login=================================================================
     def login(self):
-        print("\n" + "="*60)
-        print("🔑 LOGIN")
-        print("="*60)
+        clear_screen()
+        print_banner()
+        print("  🔑  LOGIN")
+        print_separator()
+        print("\nEnter your master password to unlock your vault.\n")
 
         attempts = 3
         while attempts > 0:
             password = secure_input("Enter master password: ")               
             if self.verify_master_password(password):
-                print("✅ Login successful!")
+                print_success("Login successful!")
                 return password
             else:
                 attempts -= 1
                 if attempts > 0:
-                    print(f"❌ Incorrect password! {attempts} attempt(s) remaining.")
+                    print_error(f"Incorrect password! {attempts} attempt(s) remaining.")
                 else:
-                    print("❌ Too many failed attempts. Exiting for security.")
+                    print_error("Too many failed attempts. Exiting for security.")
                     return None
         return None
 """=================================================================Encryption Class================================================================="""
-class Encryption:
+class Encryption:   
     def __init__(self, password, salt):
 
         self.password = password
@@ -164,17 +219,14 @@ class Vault:
         try:
             with open(VAULT_FILE , "rb") as f:
                 encrypted_data = f.read()
-            
             decrypted_data = self.fernet.decrypt(encrypted_data)
-
             vault = json.loads(decrypted_data.decode("utf-8"))
             return vault
-        
         except InvalidToken:
-            print("❌ Error: Unable to decrypt vault — wrong master password or corrupted vault.")
+            print_error("Error: Unable to decrypt vault — wrong master password or corrupted vault.")
             return None
         except Exception as e:
-            print(f"❌ Error loading vault: {e}")
+            print_error(f"Error loading vault: {e}")
             return None
 #=================================================================Save Vault=================================================================    
     def save_vault(self):
@@ -184,9 +236,9 @@ class Vault:
             encrypted_data = self.fernet.encrypt(json_data.encode('utf-8'))
             with open(VAULT_FILE , "wb") as f:
                 f.write(encrypted_data)
-            print("✅ Vault saved successfully!")
+            print_success("Vault saved successfully!")
         except Exception as e:
-            print(f"❌ Error saving vault: {e}")
+            print(f"Error saving vault: {e}")
 """=================================================================Password Manager Class================================================================="""
 class PasswordManager:
     def __init__(self , vault , fernet):
@@ -195,21 +247,26 @@ class PasswordManager:
         self.fernet = fernet
 #=================================================================Add Password=================================================================    
     def add_password(self):
-        print("\n" + "="*60)
-        print("➕ ADD PASSWORD")
-        print("="*60)
+        clear_screen()
+        print_banner()
+        print("  ➕  ADD NEW PASSWORD")
+        print_separator()
+        print()
 
         website = input("\nWebsite/Service: ").strip()
         if not website:
-            print("❌ Website cannot be empty!")
+            print_error("Website cannot be empty!")
+            press_enter()
             return
         username = input("Username/Email: ").strip()
         if not username:
-            print("❌ Username cannot be empty!")
+            print_error("Username cannot be empty!")
+            press_enter()
             return
         password = secure_input("Password: ")
         if not password:
-            print("❌ Password cannot be empty!")
+            print_error("Password cannot be empty!")
+            press_enter()
             return
         notes = input("Notes (optional): ").strip()
 
@@ -223,85 +280,138 @@ class PasswordManager:
         self.vault.append(entry)
         vault_obj = Vault(self.fernet , self.vault)
         vault_obj.save_vault()
+
+        print_success(f"Password for '{website}' saved successfully!")
+        press_enter()
 #=================================================================View Password=================================================================
     def view_passwords(self):
-        if not self.vault:
-            print("\n⚠️  No passwords stored yet!")
-            return
-        print("\n" + "="*60)
-        print("🔍 VIEW PASSWORDS")
-        print("="*60)
+        clear_screen()
+        print_banner()
+        print("  🔍  ALL PASSWORDS")
+        print_separator()
 
-        for entry in self.vault:
-            print(f"\nID: {entry['id']}")
-            print(f"Website: {entry['website']}")
-            print(f"Username: {entry['username']}")
-            print(f"Password: {entry['password']}")
+        if not self.vault:
+            print_warning("No passwords stored yet!")
+            press_enter()
+            return
+
+        print(f"\n  Total entries: {len(self.vault)}\n")
+        print_separator()
+
+        for i, entry in enumerate(self.vault, 1):
+            print(f"\n  [{i}] {entry['website'].upper()}")
+            print(f"      Username : {entry['username']}")
+            print(f"      Password : {entry['password']}")
             if entry['notes']:
-                print(f"Notes: {entry['notes']}")
+                print(f"      Notes    : {entry['notes']}")
+            print(f"      ID       : {entry['id'][:8]}...")
+            print_separator()
+
+        press_enter()
 #=================================================================Search Password=================================================================  
     def search_passwords(self):
+
+        clear_screen()
+        print_banner()
+        print("  🔎  SEARCH PASSWORDS")
+        print_separator()
+        print()
+
         if not self.vault:
-            print("\n⚠️  No passwords stored yet!")
+            print_warning("No passwords stored yet!")
+            press_enter()
             return
-        
         query = input("\nEnter website or username to search: ").strip().lower()
         if not query:
-            print("❌ Search query cannot be empty!")
+            print_error("Search query cannot be empty!")
+            press_enter()
             return
         results = [entry for entry in self.vault if query in entry['website'].lower() or query in entry['username'].lower()]
+        print()
+        print_separator()
         if results:
-            print(f"\n✅ Found {len(results)} matching entries:")
-            for entry in results:
-                print(f"\nID: {entry['id']}")
-                print(f"Website: {entry['website']}")
-                print(f"Username: {entry['username']}")
-                print(f"Password: {entry['password']}")
+            print(f"\n  ✅  Found {len(results)} result(s) for '{query}':\n")
+            print_separator()
+            for i, entry in enumerate(results, 1):
+                print(f"\n  [{i}] {entry['website'].upper()}")
+                print(f"      Username : {entry['username']}")
+                print(f"      Password : {entry['password']}")
                 if entry['notes']:
-                    print(f"Notes: {entry['notes']}")
+                    print(f"      Notes    : {entry['notes']}")
+                print_separator()
         else:
-            print("\n⚠️  No matching entries found!")
+            print_warning(f"No results found for '{query}'")
+        press_enter()
 #=================================================================Delete Password=================================================================  
     def delete_password(self):
+
+        clear_screen()
+        print_banner()
+        print("  🗑️   DELETE PASSWORD")
+        print_separator()
         if not self.vault:
-            print("\n⚠️  No passwords stored yet!")
+            print_warning("No passwords stored yet!")
+            press_enter()
             return
-        self.view_passwords()
+        
+        print(f"\n  Total entries: {len(self.vault)}\n")
+        print_separator()
+        for i, entry in enumerate(self.vault, 1):
+            print(f"  [{i}] {entry['website']} | {entry['username']}")
+        print_separator()
+        print()
 
         try:
             entry_id = input("\nEnter ID to delete (0 to cancel): ").strip()
             if entry_id == '0':
-                print("❌ Deletion cancelled.")
+                print_error("Deletion cancelled.")
+                press_enter()
                 return
-            entry = next((e for e in self.vault if e['id'] == entry_id) , None)
-            if not entry:
-                print("❌ Invalid ID!")
+            index = int(entry_id) - 1
+            if index < 0 or index >= len(self.vault):
+                print_error("Invalid ID")
+                press_enter()
                 return
-            confirm = input(f"Are you sure you want to delete entry for {entry['website']}? (y/n): ").strip().lower()
-            if confirm == 'y':
+            entry = self.vault[index]
+            print(f"\n  ⚠️  You are about to delete:")
+            print(f"      Website  : {entry['website']}")
+            print(f"      Username : {entry['username']}")
+            if entry['notes']:
+                print(f"      Notes    : {entry['notes']}")
+            print()
+            confirm = input("  Are you sure? (yes/no): ").strip().lower()
+            if confirm == 'yes':
                 self.vault.remove(entry)
                 vault_obj = Vault(self.fernet , self.vault)
                 vault_obj.save_vault()
-                print(f"✅ Password for {entry['website']} deleted!")
+                print_success(f"Password for {entry['website']} deleted!")
             else:
-                print("❌ cancelled.")
+                print_info("Deletion cancelled.")
         except ValueError:
-            print("❌ Invalid input!")
+            print_error("Invalid input!")
+        press_enter()
 """=================================================================Main Menu================================================================="""
 def main_menu(vault , fernet):
+    pm = PasswordManager(vault , fernet)
     while True:
-        print("\n" + "="*60)
-        print("🔐 PASSWORD MANAGER")
-        print("="*60)
-        print("\n1. Add Password")
-        print("2. View All Passwords")
-        print("3. Search Password")
-        print("4. Delete Password")
-        print("5. Exit")
+        clear_screen()
+        print_banner()
+        print(f"  📊  Vault Status: {len(vault)} password(s) stored")
+        print()
+        print_separator()
+        print("""
+            MAIN MENU
+
+                1. Add New Password
+                2. View All Passwords
+                3. Search Passwords
+                4. Delete Password
+                5. Exit
+            """)
+        print_separator()
+        print()
 
         choice = input("\nEnter your choice: ").strip()
-        pm = PasswordManager(vault , fernet)
-
         if choice == '1':
             pm.add_password()
         elif choice == '2':
@@ -311,10 +421,15 @@ def main_menu(vault , fernet):
         elif choice == '4':
             pm.delete_password()
         elif choice == '5':
-            print("\n👋 Goodbye! Your passwords are secure.")
+            clear_screen()
+            print_banner()
+            print_slow("  👋  Locking vault and exiting...", delay=0.04)
+            time.sleep(1)
+            clear_screen()
             break
         else:
-            print("❌ Invalid choice!")
+            print_error("Invalid choice!")
+            time.sleep(1)
 """=================================================================Main Function================================================================="""
 def main():
     print("\n" + "="*60)
@@ -322,7 +437,6 @@ def main():
     print("="*60)
 
     if not os.path.exists(MASTER_FILE):
-        print("\n👋 Welcome! Let's set up your password manager.")
         mp = MasterPassword("", b"")
         master_password = mp.create_master_password()
         if not master_password:
@@ -337,12 +451,9 @@ def main():
     vault_obj = Vault(fernet)
     vault = vault_obj.load_vault()
     if vault is None:
-
-        print("\n❌ Failed to load vault. Exiting.")
+        print_error("Failed to load vault. Exiting.")
+        time.sleep(2)
         return
-    
-    print(f"\n✅ Loaded {len(vault)} password(s)")
-
     main_menu(vault , fernet)
 
 if __name__ == "__main__":
