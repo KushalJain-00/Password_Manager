@@ -1,0 +1,11 @@
+# Password Manager Dependencies
+
+# Core encryption library
+cryptography>=41.0.0
+
+# Optional: For development and testing
+pytest>=7.4.0
+
+# Future enhancements (uncomment when implementing):
+# pyperclip>=1.8.2  # For clipboard functionality
+# colorama>=0.4.6   # For cross-platform colored output
